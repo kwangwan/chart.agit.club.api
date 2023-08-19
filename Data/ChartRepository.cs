@@ -19,29 +19,10 @@ namespace chart.agit.club.api.Data
             return new ElasticClient(Settings);
         }
 
-        private DateInterval GetCalendarInterval(string? calendarInterval)
-        {
-            bool IsMinute = calendarInterval == "minute";
-            bool IsHour = calendarInterval == "hour";
-            bool IsDay = calendarInterval == "day";
-            bool IsWeek = calendarInterval == "week";
-            bool IsMonth = calendarInterval == "month";
-            bool IsQuarter = calendarInterval == "quarter";
-            bool IsYear = calendarInterval == "year";
-
-            if (IsMinute) { return DateInterval.Minute; }
-            if (IsHour) { return DateInterval.Hour; }
-            if (IsDay) { return DateInterval.Day; }
-            if (IsWeek) { return DateInterval.Week; }
-            if (IsMonth) { return DateInterval.Month; }
-            if (IsQuarter) { return DateInterval.Quarter; }
-            return DateInterval.Year;
-        }
-
         private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartDefaultDescriptor(TwitchChatBuzzInput twitchChatBuzzInput)
         {
             string ChannelName = twitchChatBuzzInput.ChannelName ?? "";
-            string DateTimeStart = twitchChatBuzzInput.DateTimeStart ?? DateTime.Now.AddHours(-1).ToString("yyyy-MM-dd HH:mm");
+            string DateTimeStart = twitchChatBuzzInput.DateTimeStart ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm");
             string DateTimeEnd = twitchChatBuzzInput.DateTimeEnd ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm");
             string TimeZone = twitchChatBuzzInput.TimeZone ?? "+00:00";
             List<string> ShouldMatchPhrase = twitchChatBuzzInput.ShouldMatchPhrase ?? new List<string>();
@@ -59,7 +40,7 @@ namespace chart.agit.club.api.Data
             DateRangeDescriptor.DateRange(d => d
                 .Field(field => field.datetime)
                 .GreaterThanOrEquals(DateTimeStart)
-                .LessThanOrEquals(DateTimeEnd)
+                .LessThan(DateTimeEnd)
                 .Format("yyyy-MM-dd HH:mm")
                 .TimeZone(TimeZone)
             );
@@ -109,7 +90,7 @@ namespace chart.agit.club.api.Data
 
         private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartBuzzDescriptor(TwitchChatBuzzInput twitchChatBuzzInput)
         {
-            DateInterval CalendarInterval = GetCalendarInterval(twitchChatBuzzInput.CalendarInterval);
+            Time FixedInterval = new Time(twitchChatBuzzInput.FixedInterval);
             string TimeZone = twitchChatBuzzInput.TimeZone ?? "+00:00";
 
             SearchDescriptor<TwitchChatELKFormat> TwitchChartDefaultDescriptor = GetTwitchChartDefaultDescriptor(twitchChatBuzzInput);
@@ -118,38 +99,86 @@ namespace chart.agit.club.api.Data
                 .Aggregations(a => a
                     .DateHistogram("_datetime", d => d
                         .Field(field => field.datetime)
-                        .CalendarInterval(CalendarInterval)
+                        .FixedInterval(FixedInterval)
                         .Format("yyyy-MM-dd HH:mm")
                         .TimeZone(TimeZone)
                     )
                 );
         }
 
-        private TwitchChatBuzzOutput ParseTwitchChatELKResponse(ISearchResponse<TwitchChatELKFormat> response, string? charId)
+        private TwitchChatBuzzOutput ParseTwitchChatELKResponse(ISearchResponse<TwitchChatELKFormat> response, TwitchChatBuzzInput twitchChatBuzzInput)
         {
             TwitchChatBuzzOutput Result = new TwitchChatBuzzOutput();
 
-            Result.ChartId = charId;
+            Result.ChartId = twitchChatBuzzInput.ChartId;
             Result.Value = new Dictionary<string, long?>();
 
-            foreach (var item in response.Aggregations.DateHistogram("_datetime").Buckets.ToList())
-            {
-                Result.Value.Add(item.KeyAsString, item.DocCount);
-            };
-            
-            
+            bool IsMinute = twitchChatBuzzInput.FixedInterval?.EndsWith("m") ?? false;
+            bool IsHour = twitchChatBuzzInput.FixedInterval?.EndsWith("h") ?? false;
+            bool IsDay = twitchChatBuzzInput.FixedInterval?.EndsWith("d") ?? false;
+            bool IsNoInterval = !IsMinute && !IsHour && !IsDay; 
 
-            // 추가
+            int FixedIntervalLength = twitchChatBuzzInput.FixedInterval?.Length ?? 0;
+            bool IsParsed = Int32.TryParse(twitchChatBuzzInput.FixedInterval?.Remove(FixedIntervalLength - 1, 1) ?? "0", out int FixedIntervalNum);
+            if (!IsParsed)
+            {
+                FixedIntervalNum = 0;
+                IsNoInterval = true;
+            }
+
+            DateTime DateTimeStart = DateTime.Parse(twitchChatBuzzInput.DateTimeStart ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+            DateTime DateTimeEnd = DateTime.Parse(twitchChatBuzzInput.DateTimeEnd ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+            if (IsMinute)
+            {
+                DateTimeStart = DateTimeStart.AddMinutes(-(DateTimeStart.Minute%FixedIntervalNum));
+            }
+            if (IsHour)
+            {
+                DateTimeStart = DateTimeStart.AddMinutes(-DateTimeStart.Minute);
+                DateTimeStart = DateTimeStart.AddHours(-(DateTimeStart.Hour%FixedIntervalNum));
+            }
+            if (IsDay) 
+            {
+                DateTimeStart = DateTimeStart.AddMinutes(-DateTimeStart.Minute);
+                DateTimeStart = DateTimeStart.AddHours(-DateTimeStart.Hour);
+                DateTimeStart = DateTimeStart.AddDays(-(DateTimeStart.Day%FixedIntervalNum));
+            }
+
+            while (true)
+            {
+                string DateTimeStr = DateTimeStart.ToString("yyyy-MM-dd HH:mm");
+                Result.Value.Add(DateTimeStr, 0);
+                if (IsMinute) { DateTimeStart = DateTimeStart.AddMinutes(FixedIntervalNum); }
+                if (IsHour) { DateTimeStart = DateTimeStart.AddHours(FixedIntervalNum); }
+                if (IsDay) { DateTimeStart = DateTimeStart.AddDays(FixedIntervalNum); }
+                if (IsNoInterval) { break; }
+                if (DateTimeStart >= DateTimeEnd) { break; }
+            }
+
+            List<DateHistogramBucket> DateHistogramItems = response.Aggregations.DateHistogram("_datetime")?.Buckets.ToList() ?? new List<DateHistogramBucket>();
+
+            foreach (var item in DateHistogramItems)
+            {
+                Result.Value[item.KeyAsString] = item.DocCount;
+            };
 
             return Result;
         }
 
         public TwitchChatBuzzOutput GetTwitchChatBuzz(TwitchChatBuzzInput twitchChatBuzzInput)
         {
-            ISearchResponse<TwitchChatELKFormat> Response = GetElasticClient("twitch_chat")
-                .Search<TwitchChatELKFormat>(GetTwitchChartBuzzDescriptor(twitchChatBuzzInput));
+            ElasticClient Client = GetElasticClient("twitch-chat");
+            SearchDescriptor<TwitchChatELKFormat> Descriptor = GetTwitchChartBuzzDescriptor(twitchChatBuzzInput);
 
-            TwitchChatBuzzOutput Result = ParseTwitchChatELKResponse(Response, twitchChatBuzzInput.ChartId);
+            // // test
+            // var stream = new System.IO.MemoryStream();
+            // Client.RequestResponseSerializer.Serialize(Descriptor, stream);
+            // var jsonQuery = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            // Console.WriteLine(jsonQuery);
+
+            ISearchResponse<TwitchChatELKFormat> Response = Client.Search<TwitchChatELKFormat>(Descriptor);
+
+            TwitchChatBuzzOutput Result = ParseTwitchChatELKResponse(Response, twitchChatBuzzInput);
 
             return Result;
         }

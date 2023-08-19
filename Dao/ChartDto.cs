@@ -7,7 +7,7 @@
         public string? DateTimeStart { get; set; }
         public string? DateTimeEnd { get; set; }
         public string? TimeZone { get; set; }
-        public string? CalendarInterval { get; set; }
+        public string? FixedInterval { get; set; }
         public List<string>? ShouldMatchPhrase { get; set; }
         public List<string>? MustMatchPhrase { get; set; }
         public List<string>? MustNotMatchPhrase { get; set; }
