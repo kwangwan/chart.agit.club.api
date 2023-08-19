@@ -16,9 +16,15 @@ namespace chart.agit.club.api.Controllers
         }
 
         [HttpPost("twitch_chat_buzz")]
-        public TwitchChatBuzzOutput GetTwitchChatBuzz(TwitchChatBuzzInput twitchChatBuzzInput)
+        public TwitchChatBuzzOutput GetTwitchChatBuzz(TwitchChatInput twitchChatInput)
         {
-            return _chart.GetTwitchChatBuzz(twitchChatBuzzInput);
+            return _chart.GetTwitchChatBuzz(twitchChatInput);
+        }
+
+        [HttpPost("twitch_chat_messages")]
+        public List<TwitchChatMessagesOutput> GetTwitchChatMessages(TwitchChatInput twitchChatInput)
+        {
+            return _chart.GetTwitchChatMessages(twitchChatInput);
         }
     }
 }

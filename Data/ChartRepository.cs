@@ -19,7 +19,7 @@ namespace chart.agit.club.api.Data
             return new ElasticClient(Settings);
         }
 
-        private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartDefaultDescriptor(TwitchChatBuzzInput twitchChatBuzzInput)
+        private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartDefaultDescriptor(TwitchChatInput twitchChatBuzzInput)
         {
             string ChannelName = twitchChatBuzzInput.ChannelName ?? "";
             string DateTimeStart = twitchChatBuzzInput.DateTimeStart ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm");
@@ -88,12 +88,12 @@ namespace chart.agit.club.api.Data
 
         }
 
-        private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartBuzzDescriptor(TwitchChatBuzzInput twitchChatBuzzInput)
+        private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartBuzzDescriptor(TwitchChatInput twitchChatInput)
         {
-            Time FixedInterval = new Time(twitchChatBuzzInput.FixedInterval);
-            string TimeZone = twitchChatBuzzInput.TimeZone ?? "+00:00";
+            Time FixedInterval = new Time(twitchChatInput.FixedInterval);
+            string TimeZone = twitchChatInput.TimeZone ?? "+00:00";
 
-            SearchDescriptor<TwitchChatELKFormat> TwitchChartDefaultDescriptor = GetTwitchChartDefaultDescriptor(twitchChatBuzzInput);
+            SearchDescriptor<TwitchChatELKFormat> TwitchChartDefaultDescriptor = GetTwitchChartDefaultDescriptor(twitchChatInput);
             return TwitchChartDefaultDescriptor
                 .Size(0)
                 .Aggregations(a => a
@@ -106,7 +106,16 @@ namespace chart.agit.club.api.Data
                 );
         }
 
-        private TwitchChatBuzzOutput ParseTwitchChatELKResponse(ISearchResponse<TwitchChatELKFormat> response, TwitchChatBuzzInput twitchChatBuzzInput)
+        private SearchDescriptor<TwitchChatELKFormat> GetTwitchChartMessagesDescriptor(TwitchChatInput twitchChatInput)
+        {
+            Time FixedInterval = new Time(twitchChatInput.FixedInterval);
+            string TimeZone = twitchChatInput.TimeZone ?? "+00:00";
+
+            SearchDescriptor<TwitchChatELKFormat> TwitchChartDefaultDescriptor = GetTwitchChartDefaultDescriptor(twitchChatInput);
+            return TwitchChartDefaultDescriptor.Size(1000);
+        }
+
+        private TwitchChatBuzzOutput ParseTwitchChatBuzzELKResponse(ISearchResponse<TwitchChatELKFormat> response, TwitchChatInput twitchChatBuzzInput)
         {
             TwitchChatBuzzOutput Result = new TwitchChatBuzzOutput();
 
@@ -165,10 +174,25 @@ namespace chart.agit.club.api.Data
             return Result;
         }
 
-        public TwitchChatBuzzOutput GetTwitchChatBuzz(TwitchChatBuzzInput twitchChatBuzzInput)
+        private List<TwitchChatMessagesOutput> ParseTwitchChatMessageELKResponse(ISearchResponse<TwitchChatELKFormat> response)
+        {
+            List<TwitchChatMessagesOutput> Result = new List<TwitchChatMessagesOutput>();
+
+            List<IHit<TwitchChatELKFormat>> HitItems = response.Hits.OrderBy(x => x.Source.datetime).ToList();
+            foreach (var item in HitItems)
+            {
+                string CreatedAt = item.Source.datetime?.ToString("yyyy-MM-dd") ?? "";
+                string Chat = item.Source.chat ?? "";
+                Result.Add(new TwitchChatMessagesOutput { CreatedAt = CreatedAt, Chat = Chat });
+            }
+
+            return Result;
+        }
+
+        public TwitchChatBuzzOutput GetTwitchChatBuzz(TwitchChatInput twitchChatInput)
         {
             ElasticClient Client = GetElasticClient("twitch-chat");
-            SearchDescriptor<TwitchChatELKFormat> Descriptor = GetTwitchChartBuzzDescriptor(twitchChatBuzzInput);
+            SearchDescriptor<TwitchChatELKFormat> Descriptor = GetTwitchChartBuzzDescriptor(twitchChatInput);
 
             // // test
             // var stream = new System.IO.MemoryStream();
@@ -178,7 +202,25 @@ namespace chart.agit.club.api.Data
 
             ISearchResponse<TwitchChatELKFormat> Response = Client.Search<TwitchChatELKFormat>(Descriptor);
 
-            TwitchChatBuzzOutput Result = ParseTwitchChatELKResponse(Response, twitchChatBuzzInput);
+            TwitchChatBuzzOutput Result = ParseTwitchChatBuzzELKResponse(Response, twitchChatInput);
+
+            return Result;
+        }
+
+        public List<TwitchChatMessagesOutput> GetTwitchChatMessages(TwitchChatInput twitchChatInput)
+        {
+            ElasticClient Client = GetElasticClient("twitch-chat");
+            SearchDescriptor<TwitchChatELKFormat> Descriptor = GetTwitchChartMessagesDescriptor(twitchChatInput);
+
+            // // test
+            // var stream = new System.IO.MemoryStream();
+            // Client.RequestResponseSerializer.Serialize(Descriptor, stream);
+            // var jsonQuery = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            // Console.WriteLine(jsonQuery);
+
+            ISearchResponse<TwitchChatELKFormat> Response = Client.Search<TwitchChatELKFormat>(Descriptor);
+
+            List<TwitchChatMessagesOutput> Result = ParseTwitchChatMessageELKResponse(Response);
 
             return Result;
         }

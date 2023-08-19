@@ -1,6 +1,6 @@
 ﻿namespace chart.agit.club.api.Dao
 {
-    public class TwitchChatBuzzInput
+    public class TwitchChatInput
     {
         public string? ChartId { get; set; }
         public string? ChannelName { get; set; }
@@ -18,6 +18,12 @@
     {
         public string? ChartId { get; set; }
         public Dictionary<string, long?>? Value { get; set; }
+    }
+
+    public class TwitchChatMessagesOutput
+    {
+        public string? CreatedAt { get; set; }
+        public string? Chat { get; set; }
     }
 
     public class TwitchChatELKFormat
