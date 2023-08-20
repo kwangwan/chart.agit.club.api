@@ -28,6 +28,7 @@ namespace chart.agit.club.api.Data
             List<string> ShouldMatchPhrase = twitchChatBuzzInput.ShouldMatchPhrase ?? new List<string>();
             List<string> MustMatchPhrase = twitchChatBuzzInput.MustMatchPhrase ?? new List<string>();
             List<string> MustNotMatchPhrase = twitchChatBuzzInput.MustNotMatchPhrase ?? new List<string>();
+            int MinimumShouldMatch = ShouldMatchPhrase.Count > 0 ? 1 : 0;
 
             // Query Containers
             List<QueryContainer> FilterQueryContainer = new List<QueryContainer>();
@@ -81,7 +82,7 @@ namespace chart.agit.club.api.Data
                         .Should(ShouldQueryContainer.ToArray())
                         .Must(MustQueryContainer.ToArray())
                         .Must(MustNotQueryContainer.ToArray())
-                        .MinimumShouldMatch(1)
+                        .MinimumShouldMatch(MinimumShouldMatch)
                     )
                 )
                 .TrackTotalHits(true);
