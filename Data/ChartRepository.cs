@@ -25,10 +25,10 @@ namespace chart.agit.club.api.Data
             string DateTimeStart = twitchChatBuzzInput.DateTimeStart ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm");
             string DateTimeEnd = twitchChatBuzzInput.DateTimeEnd ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm");
             string TimeZone = twitchChatBuzzInput.TimeZone ?? "+00:00";
-            List<string> ShouldMatchPhrase = twitchChatBuzzInput.ShouldMatchPhrase ?? new List<string>();
-            List<string> MustMatchPhrase = twitchChatBuzzInput.MustMatchPhrase ?? new List<string>();
-            List<string> MustNotMatchPhrase = twitchChatBuzzInput.MustNotMatchPhrase ?? new List<string>();
-            int MinimumShouldMatch = ShouldMatchPhrase.Count > 0 ? 1 : 0;
+            string ShouldMatch = twitchChatBuzzInput.ShouldMatch ?? "";
+            string MustMatch = twitchChatBuzzInput.MustMatch ?? "";
+            string MustNotMatch = twitchChatBuzzInput.MustNotMatch ?? "";
+            int MinimumShouldMatch = ShouldMatch.Length > 0 ? 1 : 0;
 
             // Query Containers
             List<QueryContainer> FilterQueryContainer = new List<QueryContainer>();
@@ -55,25 +55,18 @@ namespace chart.agit.club.api.Data
             );
             FilterQueryContainer.Add(TermDescriptor);
 
-            // match_phrase
-            ShouldMatchPhrase.ForEach(query =>
-            {
-                QueryContainerDescriptor<TwitchChatELKFormat> MatchPhraseDescriptor = new QueryContainerDescriptor<TwitchChatELKFormat>();
-                MatchPhraseDescriptor.MatchPhrase(m => m.Field(field => field.chat).Query(query).Slop(1));
-                ShouldQueryContainer.Add(MatchPhraseDescriptor);
-            });
-            MustMatchPhrase.ForEach(query =>
-            {
-                QueryContainerDescriptor<TwitchChatELKFormat> MatchPhraseDescriptor = new QueryContainerDescriptor<TwitchChatELKFormat>();
-                MatchPhraseDescriptor.MatchPhrase(m => m.Field(field => field.chat).Query(query).Slop(1));
-                MustQueryContainer.Add(MatchPhraseDescriptor);
-            });
-            MustNotMatchPhrase.ForEach(query =>
-            {
-                QueryContainerDescriptor<TwitchChatELKFormat> MatchPhraseDescriptor = new QueryContainerDescriptor<TwitchChatELKFormat>();
-                MatchPhraseDescriptor.MatchPhrase(m => m.Field(field => field.chat).Query(query).Slop(1));
-                MustNotQueryContainer.Add(MatchPhraseDescriptor);
-            });
+            // match
+            QueryContainerDescriptor<TwitchChatELKFormat> ShouldMatchDescriptor = new QueryContainerDescriptor<TwitchChatELKFormat>();
+            ShouldMatchDescriptor.Match(m => m.Field(field => field.chat).Query(ShouldMatch));
+            ShouldQueryContainer.Add(ShouldMatchDescriptor);
+
+            QueryContainerDescriptor<TwitchChatELKFormat> MustMatchDescriptor = new QueryContainerDescriptor<TwitchChatELKFormat>();
+            MustMatchDescriptor.Match(m => m.Field(field => field.chat).Query(MustMatch));
+            MustQueryContainer.Add(MustMatchDescriptor);
+
+            QueryContainerDescriptor<TwitchChatELKFormat> MustNotMatchDescriptor = new QueryContainerDescriptor<TwitchChatELKFormat>();
+            MustNotMatchDescriptor.Match(m => m.Field(field => field.chat).Query(MustNotMatch));
+            MustNotQueryContainer.Add(MustNotMatchDescriptor);
 
             return new SearchDescriptor<TwitchChatELKFormat>()
                 .Query(q => q
@@ -195,11 +188,11 @@ namespace chart.agit.club.api.Data
             ElasticClient Client = GetElasticClient("twitch-chat");
             SearchDescriptor<TwitchChatELKFormat> Descriptor = GetTwitchChartBuzzDescriptor(twitchChatInput);
 
-            // // test
-            // var stream = new System.IO.MemoryStream();
-            // Client.RequestResponseSerializer.Serialize(Descriptor, stream);
-            // var jsonQuery = System.Text.Encoding.UTF8.GetString(stream.ToArray());
-            // Console.WriteLine(jsonQuery);
+            // test
+            var stream = new System.IO.MemoryStream();
+            Client.RequestResponseSerializer.Serialize(Descriptor, stream);
+            var jsonQuery = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            Console.WriteLine(jsonQuery);
 
             ISearchResponse<TwitchChatELKFormat> Response = Client.Search<TwitchChatELKFormat>(Descriptor);
 
@@ -213,11 +206,11 @@ namespace chart.agit.club.api.Data
             ElasticClient Client = GetElasticClient("twitch-chat");
             SearchDescriptor<TwitchChatELKFormat> Descriptor = GetTwitchChartMessagesDescriptor(twitchChatInput);
 
-            // // test
-            // var stream = new System.IO.MemoryStream();
-            // Client.RequestResponseSerializer.Serialize(Descriptor, stream);
-            // var jsonQuery = System.Text.Encoding.UTF8.GetString(stream.ToArray());
-            // Console.WriteLine(jsonQuery);
+            // test
+            var stream = new System.IO.MemoryStream();
+            Client.RequestResponseSerializer.Serialize(Descriptor, stream);
+            var jsonQuery = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            Console.WriteLine(jsonQuery);
 
             ISearchResponse<TwitchChatELKFormat> Response = Client.Search<TwitchChatELKFormat>(Descriptor);
 

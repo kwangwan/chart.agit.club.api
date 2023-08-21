@@ -8,9 +8,9 @@
         public string? DateTimeEnd { get; set; }
         public string? TimeZone { get; set; }
         public string? FixedInterval { get; set; }
-        public List<string>? ShouldMatchPhrase { get; set; }
-        public List<string>? MustMatchPhrase { get; set; }
-        public List<string>? MustNotMatchPhrase { get; set; }
+        public string? ShouldMatch { get; set; }
+        public string? MustMatch { get; set; }
+        public string? MustNotMatch { get; set; }
 
     }
 
